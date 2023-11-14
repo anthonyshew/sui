@@ -14,6 +14,9 @@ use sui_types::error::SuiError;
 use sui_types::message_envelope::{Envelope, Message};
 use tracing::warn;
 
+const STRONG: bool = true;
+const WEAK: bool = false;
+
 /// StakeAggregator allows us to keep track of the total stake of a set of validators.
 /// STRENGTH indicates whether we want a strong quorum (2f+1) or a weak quorum (f+1).
 #[derive(Debug)]
@@ -93,6 +96,10 @@ impl<S: Clone + Eq, const STRENGTH: bool> StakeAggregator<S, STRENGTH> {
         self.data.contains_key(authority)
     }
 
+    pub fn keys(&self) -> impl Iterator<Item = &AuthorityName> {
+        self.data.keys()
+    }
+
     pub fn committee(&self) -> &Committee {
         &self.committee
     }
@@ -103,6 +110,14 @@ impl<S: Clone + Eq, const STRENGTH: bool> StakeAggregator<S, STRENGTH> {
 
     pub fn has_quorum(&self) -> bool {
         self.total_votes >= self.committee.threshold::<STRENGTH>()
+    }
+
+    pub fn has_quorum_with_strength(&self, strength: bool) -> bool {
+        if strength {
+            self.total_votes >= self.committee.threshold::<STRONG>()
+        } else {
+            self.total_votes >= self.committee.threshold::<WEAK>()
+        }
     }
 
     pub fn validator_sig_count(&self) -> usize {
@@ -238,6 +253,23 @@ impl<K, V, const STRENGTH: bool> MultiStakeAggregator<K, V, STRENGTH> {
             .map(|(_, stake_aggregator)| stake_aggregator.total_votes())
             .sum()
     }
+
+    pub fn all_with_quorum(&self) -> impl Iterator<Item = &K> {
+        self.stake_maps
+            .iter()
+            .filter_map(|(k, (_, agg))| if agg.has_quorum() { Some(k) } else { None })
+    }
+
+    #[allow(dead_code)]
+    pub fn all_with_quorum_for_strength(&self, strength: bool) -> impl Iterator<Item = &K> {
+        self.stake_maps.iter().filter_map(move |(k, (_, agg))| {
+            if agg.has_quorum_with_strength(strength.clone()) {
+                Some(k)
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl<K, V, const STRENGTH: bool> MultiStakeAggregator<K, V, STRENGTH>
@@ -274,6 +306,33 @@ where
             .iter()
             .map(|(k, (_, s))| (k.clone(), (s.data.keys().copied().collect(), s.total_votes)))
             .collect()
+    }
+}
+
+impl<K, V, const STRENGTH: bool> MultiStakeAggregator<K, V, STRENGTH>
+where
+    K: Hash + Eq,
+{
+    #[allow(dead_code)]
+    pub fn has_quorum_for_key(&self, k: &K) -> bool {
+        if let Some((_, agg)) = self.stake_maps.get(k) {
+            agg.has_quorum()
+        } else {
+            false
+        }
+    }
+
+    pub fn has_quorum_for_key_with_strength(&self, k: &K, strength: bool) -> bool {
+        if let Some((_, agg)) = self.stake_maps.get(k) {
+            agg.has_quorum_with_strength(strength)
+        } else {
+            false
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn authorities_for_key(&self, k: &K) -> Option<impl Iterator<Item = &AuthorityName>> {
+        self.stake_maps.get(k).map(|(_, agg)| agg.keys())
     }
 }
 
