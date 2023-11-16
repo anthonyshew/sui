@@ -786,8 +786,6 @@ impl AuthorityState {
             SuiError::InvalidSystemTransaction
         );
 
-        let _metrics_guard = self.metrics.handle_transaction_latency.start_timer();
-
         self.metrics.tx_orders.inc();
 
         // The should_accept_user_certs check here is best effort, because
