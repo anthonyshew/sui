@@ -392,11 +392,21 @@ impl QueryBuilder {
         let mut query = events::dsl::events.into_boxed();
         if let Some(cursor_val) = cursor {
             if descending_order {
-                query = query.filter(events::dsl::tx_sequence_number.lt(cursor_val.0));
-                query = query.filter(events::dsl::event_sequence_number.lt(cursor_val.1));
+                query = query.filter(
+                    events::dsl::tx_sequence_number.lt(cursor_val.0).or(
+                        events::dsl::tx_sequence_number
+                            .eq(cursor_val.0)
+                            .and(events::dsl::event_sequence_number.lt(cursor_val.1)),
+                    ),
+                );
             } else {
-                query = query.filter(events::dsl::tx_sequence_number.gt(cursor_val.0));
-                query = query.filter(events::dsl::event_sequence_number.gt(cursor_val.1));
+                query = query.filter(
+                    events::dsl::tx_sequence_number.gt(cursor_val.0).or(
+                        events::dsl::tx_sequence_number
+                            .eq(cursor_val.0)
+                            .and(events::dsl::event_sequence_number.gt(cursor_val.1)),
+                    ),
+                );
             }
         }
         if descending_order {
@@ -414,6 +424,7 @@ impl QueryBuilder {
 
         if let Some(filter) = filter {
             if let Some(sender) = filter.sender {
+                // Construct a subquery to filter on senders - this is because we do not have an index on the senders column.
                 let subquery = tx_senders::dsl::tx_senders
                     .filter(tx_senders::dsl::sender.eq(sender.into_vec()))
                     .select(tx_senders::dsl::tx_sequence_number);
@@ -430,29 +441,23 @@ impl QueryBuilder {
                 query = query.filter(events::dsl::tx_sequence_number.eq_any(subquery));
             }
 
-            match (filter.emitting_package, filter.emitting_module) {
-                (Some(p), None) => {
-                    query = query.filter(events::dsl::package.eq(p.into_vec()));
-                }
-                (Some(p), Some(m)) => {
-                    query = query.filter(events::dsl::package.eq(p.into_vec()));
+            if let Some(p) = filter.emitting_package {
+                query = query.filter(events::dsl::package.eq(p.into_vec()));
+
+                if let Some(m) = filter.emitting_module {
                     query = query.filter(events::dsl::module.eq(m));
                 }
-                _ => {}
             }
 
-            match (filter.event_package, filter.event_module, filter.event_type) {
-                (Some(p), None, None) => {
-                    query = query.filter(events::dsl::event_type.like(format!("{}::%", p)));
-                }
-                (Some(p), Some(m), None) => {
+            if let Some(p) = filter.event_package {
+                if let Some(m) = filter.event_module {
+                    if let Some(t) = filter.event_type {
+                        query = query
+                            .filter(events::dsl::event_type.like(format!("{}::{}::{}%", p, m, t)));
+                    }
                     query = query.filter(events::dsl::event_type.like(format!("{}::{}::%", p, m)));
                 }
-                (Some(p), Some(m), Some(t)) => {
-                    query =
-                        query.filter(events::dsl::event_type.like(format!("{}::{}::{}%", p, m, t)));
-                }
-                _ => {}
+                query = query.filter(events::dsl::event_type.like(format!("{}::%", p)));
             }
         }
 
