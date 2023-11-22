@@ -373,6 +373,22 @@ impl Module {
             .as_str()
     }
 
+    /// Iterate over the structs with names strictly after `after` (or from the beginning), and
+    /// strictly before `before` (or to the end).
+    pub fn structs(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> impl Iterator<Item = &str> + Clone {
+        use std::ops::Bound as B;
+        self.struct_index
+            .range::<str, _>((
+                after.map_or(B::Unbounded, B::Excluded),
+                before.map_or(B::Unbounded, B::Excluded),
+            ))
+            .map(|(name, _)| name.as_str())
+    }
+
     /// Get the struct definition corresponding to the struct with name `name` in this module.
     /// Returns `Ok(None)` if the struct cannot be found in this module, `Err(...)` if there was an
     /// error deserializing it, and `Ok(Some(def))` on success.
