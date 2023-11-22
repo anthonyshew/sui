@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use lru::LruCache;
-use move_binary_format::file_format::{StructTypeParameter, AbilitySet};
+use move_binary_format::file_format::{AbilitySet, StructTypeParameter};
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use std::{borrow::Cow, collections::BTreeMap};
@@ -368,7 +368,9 @@ impl Module {
 
     /// The module's name
     pub fn name(&self) -> &str {
-        self.bytecode.identifier_at(self.bytecode.self_handle().name).as_str()
+        self.bytecode
+            .identifier_at(self.bytecode.self_handle().name)
+            .as_str()
     }
 
     /// Get the struct definition corresponding to the struct with name `name` in this module.
@@ -615,7 +617,10 @@ impl ResolutionContext {
                 } = s.as_ref();
 
                 if def.type_params.len() != type_params.len() {
-                    return Err(Error::TypeArityMismatch(def.type_params.len(), type_params.len()));
+                    return Err(Error::TypeArityMismatch(
+                        def.type_params.len(),
+                        type_params.len(),
+                    ));
                 }
 
                 // TODO (optimization): This could be made more efficient by only generating layouts
