@@ -14,7 +14,6 @@ use super::{
     sui_address::SuiAddress,
 };
 
-/// Description of a type, defined in a Move module.
 pub(crate) struct MoveStruct {
     defining_id: SuiAddress,
     module: String,
@@ -38,6 +37,7 @@ pub(crate) struct MoveField {
     type_: OpenMoveType,
 }
 
+/// Description of a type, defined in a Move module.
 #[Object]
 impl MoveStruct {
     /// The module this struct was originally defined in.
@@ -58,7 +58,7 @@ impl MoveStruct {
         Ok(module)
     }
 
-    /// The struct's (unqualified) type name
+    /// The struct's (unqualified) type name.
     async fn name(&self) -> &str {
         &self.name
     }
