@@ -680,13 +680,16 @@ type MovePackage {
 	asObject: Object!
 }
 
+"""
+Description of a type, defined in a Move module.
+"""
 type MoveStruct {
 	"""
 	The module this struct was originally defined in.
 	"""
 	module: MoveModule!
 	"""
-	The struct's (unqualified) type name
+	The struct's (unqualified) type name.
 	"""
 	name: String!
 	"""
