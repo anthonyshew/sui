@@ -3,7 +3,9 @@
 
 use async_trait::async_trait;
 use lru::LruCache;
-use move_binary_format::file_format::{AbilitySet, StructTypeParameter, FunctionDefinitionIndex, Visibility, SignatureIndex, Signature};
+use move_binary_format::file_format::{
+    AbilitySet, FunctionDefinitionIndex, Signature, SignatureIndex, StructTypeParameter, Visibility,
+};
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use std::{borrow::Cow, collections::BTreeMap};
@@ -523,7 +525,7 @@ impl OpenSignature {
             sig => OpenSignature {
                 ref_: None,
                 body: OpenSignatureBody::read(sig, bytecode)?,
-            }
+            },
         })
     }
 }
@@ -1392,7 +1394,10 @@ mod tests {
             (1, build_package("c0"), c0_types()),
         ]);
 
-        let c0 = cache.fetch(AccountAddress::from_str("0xc0").unwrap()).await.unwrap();
+        let c0 = cache
+            .fetch(AccountAddress::from_str("0xc0").unwrap())
+            .await
+            .unwrap();
         let m = c0.module("m").unwrap();
 
         assert_eq!(
@@ -1487,11 +1492,11 @@ mod tests {
                     },
                 ],
             }"#]];
-        expect.assert_eq(&format!("\
-            c0::m::foo: {foo:#?}\n\
-            c0::m::bar: {bar:#?}\n\
-            c0::m::baz: {baz:#?}\
-        "));
+        expect.assert_eq(&format!(
+            "c0::m::foo: {foo:#?}\n\
+             c0::m::bar: {bar:#?}\n\
+             c0::m::baz: {baz:#?}"
+        ));
     }
 
     /***** Test Helpers ***************************************************************************/
