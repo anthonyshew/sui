@@ -267,7 +267,7 @@ fragment NodeNames on MoveStructConnection {
                 }
 
                 # Remaining tests are similar to after/first but with
-                # before/after.
+                # before/last.
                 suffix: structConnection(before: "TreasuryCap", last: 2) {
                     ...NodeNames
                 }
