@@ -1155,7 +1155,10 @@ mod tests {
     #[tokio::test]
     async fn test_structs() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
-        let a0 = cache.fetch(AccountAddress::from_str("0xa0").unwrap()).await.unwrap();
+        let a0 = cache
+            .fetch(AccountAddress::from_str("0xa0").unwrap())
+            .await
+            .unwrap();
         let m = a0.module("m").unwrap();
 
         assert_eq!(
@@ -1163,20 +1166,14 @@ mod tests {
             vec!["T0", "T1", "T2"],
         );
 
-        assert_eq!(
-            m.structs(None, Some("T1")).collect::<Vec<_>>(),
-            vec!["T0"],
-        );
+        assert_eq!(m.structs(None, Some("T1")).collect::<Vec<_>>(), vec!["T0"],);
 
         assert_eq!(
             m.structs(Some("T0"), Some("T2")).collect::<Vec<_>>(),
             vec!["T1"],
         );
 
-        assert_eq!(
-            m.structs(Some("T1"), None).collect::<Vec<_>>(),
-            vec!["T2"],
-        );
+        assert_eq!(m.structs(Some("T1"), None).collect::<Vec<_>>(), vec!["T2"],);
 
         let t0 = m.struct_def("T0").unwrap().unwrap();
         let t1 = m.struct_def("T1").unwrap().unwrap();
@@ -1262,11 +1259,11 @@ mod tests {
                     ),
                 ],
             }"#]];
-        expect.assert_eq(&format!("\
-            a0::m::T0: {t0:#?}\n\
-            a0::m::T1: {t1:#?}\n\
-            a0::m::T2: {t2:#?}\
-        "));
+        expect.assert_eq(&format!(
+            "a0::m::T0: {t0:#?}\n\
+             a0::m::T1: {t1:#?}\n\
+             a0::m::T2: {t2:#?}"
+        ));
     }
 
     /***** Test Helpers ***************************************************************************/
