@@ -1,6 +1,6 @@
 processed 8 tasks
 
-task 1 'run-graphql'. lines 6-70:
+task 1 'run-graphql'. lines 8-72:
 Response: {
   "data": {
     "transactionBlockConnection": {
@@ -244,10 +244,10 @@ Response: {
   }
 }
 
-task 3 'create-checkpoint'. lines 74-74:
+task 3 'create-checkpoint'. lines 76-76:
 Checkpoint created: 1
 
-task 4 'run-graphql'. lines 76-141:
+task 4 'run-graphql'. lines 78-145:
 Response: {
   "data": {
     "transactionBlockConnection": {
@@ -328,10 +328,10 @@ Response: {
   }
 }
 
-task 6 'advance-epoch'. lines 145-145:
+task 6 'advance-epoch'. lines 149-149:
 Epoch advanced: 0
 
-task 7 'run-graphql'. lines 147-214:
+task 7 'run-graphql'. lines 151-219:
 Response: {
   "data": {
     "transactionBlockConnection": {
