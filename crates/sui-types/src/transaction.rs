@@ -2201,9 +2201,9 @@ impl Message for SenderSignedData {
         Ok(())
     }
 
-    fn verify_epoch(&self, epoch: EpochId) -> SuiResult {
+    fn verify_epoch(&self, epoch: EpochId, verify_max_epoch: bool) -> SuiResult {
         for sig in &self.inner().tx_signatures {
-            sig.verify_user_authenticator_epoch(epoch)?;
+            sig.verify_user_authenticator_epoch(epoch, verify_max_epoch)?;
         }
 
         Ok(())

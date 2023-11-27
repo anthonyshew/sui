@@ -1384,6 +1384,7 @@
                 "txn_base_cost_as_multiplier": false,
                 "upgraded_multisig_supported": false,
                 "verify_legacy_zklogin_address": false,
+                "verify_zklogin_max_epoch_and_new_iss": false,
                 "zklogin_auth": false
               },
               "attributes": {

@@ -97,6 +97,8 @@ const MAX_PROTOCOL_VERSION: u64 = 32;
 //             Enable transfer to object in testnet.
 //             Enable Narwhal CertificateV2 on mainnet
 //             Make critbit tree and order getters public in deepbook.
+//             Enable accepting Multisig containing zkLogin sig.
+//             Enforce upper bound for max epoch and accepts Google's other iss in zkLogin signature.
 
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProtocolVersion(u64);
@@ -347,6 +349,9 @@ struct FeatureFlags {
     // If true, multisig containing zkLogin sig is accepted.
     #[serde(skip_serializing_if = "is_false")]
     accept_zklogin_in_multisig: bool,
+    // If true, verify the upper bound of max_epoch in a zkLogin signature, also checks the new iss for Google.
+    #[serde(skip_serializing_if = "is_false")]
+    verify_zklogin_max_epoch_and_new_iss: bool,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -1045,6 +1050,9 @@ impl ProtocolConfig {
         self.feature_flags.accept_zklogin_in_multisig
     }
 
+    pub fn verify_zklogin_max_epoch_and_new_iss(&self) -> bool {
+        self.feature_flags.verify_zklogin_max_epoch_and_new_iss
+    }
     pub fn throughput_aware_consensus_submission(&self) -> bool {
         self.feature_flags.throughput_aware_consensus_submission
     }
@@ -1670,6 +1678,9 @@ impl ProtocolConfig {
 
                     // enable nw cert v2 on mainnet
                     cfg.feature_flags.narwhal_certificate_v2 = true;
+
+                    // enable max_epoch upper bound check and accepts Google's alternative iss.
+                    cfg.feature_flags.verify_zklogin_max_epoch_and_new_iss = true;
                 }
                 // Use this template when making changes:
                 //
