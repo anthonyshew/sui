@@ -1013,7 +1013,6 @@ type Object implements ObjectOwner {
 }
 
 type ObjectChange {
-	inputState: Object
 	outputState: Object
 	idCreated: Boolean
 	idDeleted: Boolean
