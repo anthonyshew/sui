@@ -147,7 +147,7 @@ impl TransactionBlockEffects {
         let mut changes = Vec::with_capacity(self.stored.balance_changes.len());
         for change in &self.stored.balance_changes {
             let Some(change) = change else { continue };
-            changes.push(BalanceChange::read(&change).extend()?);
+            changes.push(BalanceChange::read(change).extend()?);
         }
 
         Ok(Some(changes))
