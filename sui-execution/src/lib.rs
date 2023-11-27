@@ -28,7 +28,6 @@ pub fn executor(
     protocol_config: &ProtocolConfig,
     paranoid_type_checks: bool,
     silent: bool,
-    enable_profiler: Option<PathBuf>,
 ) -> SuiResult<Arc<dyn Executor + Send + Sync>> {
     let version = protocol_config.execution_version_as_option().unwrap_or(0);
     Ok(match version {
@@ -36,21 +35,18 @@ pub fn executor(
             protocol_config,
             paranoid_type_checks,
             silent,
-            enable_profiler,
         )?),
 
         1 => Arc::new(v1::Executor::new(
             protocol_config,
             paranoid_type_checks,
             silent,
-            enable_profiler,
         )?),
 
         2 => Arc::new(latest::Executor::new(
             protocol_config,
             paranoid_type_checks,
             silent,
-            enable_profiler,
         )?),
 
         NEXT_VM => Arc::new(next_vm::Executor::new(
