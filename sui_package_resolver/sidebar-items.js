@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["OpenSignatureBody"],"mod":["error"],"struct":["Module","Package","PackageStoreWithLruCache","Resolver","StructRef"],"trait":["PackageStore"],"type":["Result","StructKey"]};
