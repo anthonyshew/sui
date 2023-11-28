@@ -7,7 +7,7 @@
 use ethers::types::{Address, U256};
 use serde::{Deserialize, Serialize};
 use sui_sdk::{SuiClient as SuiClientInner, SuiClientBuilder};
-use sui_types::base_types::SuiAddress;
+use sui_types::{base_types::SuiAddress, digests::TransactionDigest};
 
 use crate::error::BridgeResult;
 
@@ -37,7 +37,15 @@ impl SuiClient {
         Ok(())
     }
 
-    pub async fn get_bridge_events_maybe(
+    pub async fn query_bridge_events(
+        &self,
+        tx_digest: &str,
+        cursor: TransactionDigest,
+    ) -> BridgeResult<Vec<SuiBridgeEvent>> {
+        unimplemented!()
+    }
+
+    pub async fn get_bridge_events_by_tx_digest(
         &self,
         tx_digest: &str,
     ) -> BridgeResult<Vec<SuiBridgeEvent>> {
