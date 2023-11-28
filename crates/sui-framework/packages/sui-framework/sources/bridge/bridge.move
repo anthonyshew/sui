@@ -15,9 +15,9 @@ module sui::bridge {
     use sui::bridge_treasury::{Self, BridgeTreasury};
     use sui::chain_ids;
     use sui::coin::{Self, Coin};
-    use sui::dynamic_field as df;
     use sui::event::emit;
     use sui::object::UID;
+    use sui::table::{Self, Table};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
@@ -30,7 +30,11 @@ module sui::bridge {
         // Escrow for storing native tokens
         escrow: BridgeEscrow,
         // Bridge treasury for mint/burn bridged tokens
-        treasury: BridgeTreasury
+        treasury: BridgeTreasury,
+        pending_messages: Table<BridgeMessageKey, BridgeMessage>,
+        approved_messages: Table<BridgeMessageKey, ApprovedBridgeMessage>,
+
+        paused: bool
     }
 
     // message types
@@ -54,7 +58,7 @@ module sui::bridge {
         signatures: vector<vector<u8>>,
     }
 
-    struct ApprovedBridgeMessageKey has copy, drop, store {
+    struct BridgeMessageKey has copy, drop, store {
         source_chain: u8,
         bridge_seq_num: u64
     }
@@ -64,11 +68,11 @@ module sui::bridge {
         message_bytes: vector<u8>
     }
 
-    const UnexpectedMessageType: u64 = 0;
-    const UnauthorisedClaim: u64 = 1;
-    const MalformedMessageError: u64 = 2;
-    const UnexpectedTokenType: u64 = 3;
-    const UnexpectedChainID: u64 = 4;
+    const EUnexpectedMessageType: u64 = 0;
+    const EUnauthorisedClaim: u64 = 1;
+    const EMalformedMessageError: u64 = 2;
+    const EUnexpectedTokenType: u64 = 3;
+    const EUnexpectedChainID: u64 = 4;
 
     fun serialise_token_bridge_payload<T>(token: &Coin<T>): vector<u8> {
         let coin_type = bcs::to_bytes(type_name::borrow_string(&type_name::get<T>()));
@@ -80,7 +84,7 @@ module sui::bridge {
     fun deserialise_token_bridge_payload(message: vector<u8>): (String, u64) {
         let bcs = bcs::new(message);
         let payload = bcs::peel_vec_vec_u8(&mut bcs);
-        assert!(vector::length(&payload) == 2, MalformedMessageError);
+        assert!(vector::length(&payload) == 2, EMalformedMessageError);
         let amount_bytes = bcs::new(vector::pop_back(&mut payload));
         let amount = bcs::peel_u64(&mut amount_bytes);
 
@@ -125,30 +129,7 @@ module sui::bridge {
         message
     }
 
-    /*    // todo: Send object to ethereum
-        public fun send_object<T: key + store>(
-            bridge: &mut Bridge,
-            target_chain: u8,
-            target_address: vector<u8>,
-            obj: T,
-            ctx: &mut TxContext
-        ) {
-            bridge.sequence_num = bridge.sequence_num + 1;
-            // create bridge message
-            let message = encode_message(&obj);
-            // escrow object
-            bridge_escrow::escrow_object(&mut bridge.escrow, obj);
-            // emit event
-            emit(BridgeEvent {
-                sequence_num: bridge.sequence_num,
-                sui_address: tx_context::sender(ctx),
-                target_chain,
-                target_address,
-                message
-            })
-        }*/
-
-    // Send token to ethereum
+    // Create bridge request to send token to ethereum, the request will be in pending state until approved
     public fun send_token<T>(
         self: &mut Bridge,
         target_chain: u8,
@@ -156,13 +137,14 @@ module sui::bridge {
         token: Coin<T>,
         ctx: &mut TxContext
     ) {
+        let bridge_seq_num = self.sequence_num;
         self.sequence_num = self.sequence_num + 1;
         // create bridge message
         let payload = serialise_token_bridge_payload(&token);
         let message = BridgeMessage {
             message_type: TOKEN_BRIDGE_MSG,
             source_chain: chain_ids::sui(),
-            bridge_seq_num: self.sequence_num,
+            bridge_seq_num,
             sender_address: address::to_bytes(tx_context::sender(ctx)),
             target_chain,
             target_address,
@@ -174,58 +156,84 @@ module sui::bridge {
         }else {
             bridge_escrow::escrow_token(&mut self.escrow, token);
         };
+        // Store pending bridge request
+        let key = BridgeMessageKey { source_chain: chain_ids::sui(), bridge_seq_num };
+        table::add(&mut self.pending_messages, key, message);
+
         // emit event
         emit(BridgeEvent { message, message_bytes: serialise_message(message) })
     }
 
-    // Record bridged message approvels in Sui, call by the bridge client
-    public fun approve(
-        bridge: &mut Bridge,
-        message: vector<u8>,
+    // Record bridge message approvels in Sui, call by the bridge client
+    public fun approve_sui_bridge_request(
+        self: &mut Bridge,
+        bridge_seq_num: u64,
         signatures: vector<vector<u8>>,
         ctx: &TxContext
     ) {
+        let key = BridgeMessageKey { source_chain: chain_ids::sui(), bridge_seq_num };
+        // retrieve pending request
+        let message = table::remove(&mut self.pending_messages,key);
+        let message_bytes = serialise_message(message);
         // varify signatures
-        bridge_governance::verify_signatures(&bridge.committee, message, signatures);
-        let message = deserialise_message(message);
+        bridge_governance::verify_signatures(&self.committee, message_bytes, signatures);
         let approved_message = ApprovedBridgeMessage {
             message,
             approved_epoch: tx_context::epoch(ctx),
             signatures,
         };
-        df::add(
-            &mut bridge.id,
-            ApprovedBridgeMessageKey { source_chain: message.source_chain, bridge_seq_num: message.bridge_seq_num },
-            approved_message
-        )
+        // Store approval
+        // TODO: archieve approvals?
+        table::add(&mut self.approved_messages, key, approved_message);
     }
 
-    // Claim message from ethereum
+    // Record bridge message approvels in Sui, call by the bridge client
+    public fun approve_foreign_bridge_request(
+        self: &mut Bridge,
+        message: vector<u8>,
+        signatures: vector<vector<u8>>,
+        ctx: &TxContext
+    ) {
+        // varify signatures
+        bridge_governance::verify_signatures(&self.committee, message, signatures);
+        let message = deserialise_message(message);
+        // Ensure message is not from Sui
+        assert!(message.source_chain != chain_ids::sui(), EUnexpectedChainID);
+        let approved_message = ApprovedBridgeMessage {
+            message,
+            approved_epoch: tx_context::epoch(ctx),
+            signatures,
+        };
+        let key = BridgeMessageKey { source_chain: message.source_chain, bridge_seq_num: message.bridge_seq_num };
+
+        // Store approval
+        table::add(&mut self.approved_messages, key, approved_message);
+    }
+
+    // Claim token from approved bridge message
     fun claim_token_internal<T>(
         self: &mut Bridge,
         source_chain: u8,
         bridge_seq_num: u64,
         ctx: &mut TxContext
     ): (Coin<T>, address) {
+        let key = BridgeMessageKey { source_chain, bridge_seq_num };
         // retrieve approved bridge message
         let ApprovedBridgeMessage {
             message,
             approved_epoch: _,
             signatures: _,
-        } = df::remove<ApprovedBridgeMessageKey, ApprovedBridgeMessage>(
-            &mut self.id,
-            ApprovedBridgeMessageKey { source_chain, bridge_seq_num }
-        );
+        } = table::remove(&mut self.approved_messages, key);
         // ensure target chain is Sui
-        assert!(message.target_chain == chain_ids::sui(), UnexpectedChainID);
+        assert!(message.target_chain == chain_ids::sui(), EUnexpectedChainID);
         // get owner address
         let owner = address::from_bytes(message.target_address);
         // ensure this is a token bridge message
-        assert!(message.message_type == TOKEN_BRIDGE_MSG, UnexpectedMessageType);
+        assert!(message.message_type == TOKEN_BRIDGE_MSG, EUnexpectedMessageType);
         // extract token message
         let (token_type, amount) = deserialise_token_bridge_payload(message.payload);
         // check token type
-        assert!(type_name::into_string(type_name::get<T>()) == token_type, UnexpectedTokenType);
+        assert!(type_name::into_string(type_name::get<T>()) == token_type, EUnexpectedTokenType);
         // claim from escrow or treasury
         let token = if (bridge_treasury::is_bridged_token<T>()) {
             bridge_treasury::mint<T>(&mut self.treasury, amount, ctx)
@@ -235,30 +243,11 @@ module sui::bridge {
         (token, owner)
     }
 
-    /*    fun claim_object_internal<T>(self: &mut Bridge, bridge_tx_hash: vector<u8>, ): T {
-            // retrieve approved bridge message
-            let ApprovedBridgeMessage {
-                target_chain,
-                target_address,
-                message,
-                approved_epoch: _,
-                signatures: _,
-            } = df::remove<vector<u8>, ApprovedBridgeMessage>(&mut self.id, bridge_tx_hash);
-            // ensure target chain is Sui
-            assert!(target_chain == SUI, UnexpectedChainID);
-            // get owner address
-            let owner = address::from_bytes(target_address);
-            // ensure this is a token bridge message
-            assert!(message.message_type == OBJ_BRIDGE_MSG, UnexpectedMessageType);
-            // get object id
-            // Todo?
-        }*/
-
     // This function can only be called by the token recipient
     public fun claim_token<T>(self: &mut Bridge, source_chain: u8, bridge_seq_num: u64, ctx: &mut TxContext): Coin<T> {
         let (token, owner) = claim_token_internal<T>(self, source_chain, bridge_seq_num, ctx);
         // Only token owner can claim the token
-        assert!(tx_context::sender(ctx) == owner, UnauthorisedClaim);
+        assert!(tx_context::sender(ctx) == owner, EUnauthorisedClaim);
         token
     }
 
@@ -272,4 +261,7 @@ module sui::bridge {
         let (token, owner) = claim_token_internal<T>(self, source_chain, bridge_seq_num, ctx);
         transfer::public_transfer(token, owner)
     }
+
+    // TODO: red button
+    public fun pause_bridge(committee: &BridgeCommittee, nonce: u64, signatures: vector<vector<u8>>) {}
 }
