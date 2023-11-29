@@ -1,5 +1,11 @@
 # @mysten/dapp-kit
 
+## 0.10.2
+
+### Patch Changes
+
+- 2ae1a6a10: Early return on `useAutoConnectWallet` to improve account switching performance
+
 ## 0.10.1
 
 ### Patch Changes
